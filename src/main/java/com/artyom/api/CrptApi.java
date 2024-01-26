@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.platform.commons.logging.Logger;
+import org.junit.platform.commons.logging.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -15,10 +17,7 @@ import java.net.URL;
 import java.sql.Date;
 import java.time.LocalTime;
 import java.util.List;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -26,51 +25,41 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CrptApi {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final String URL = "https://ismp.crpt.ru/api/v3/lk/documents/create";
+    private static final Logger logger = LoggerFactory.getLogger(CrptApi.class);
     private final Long limitMs;
     private final TimeUnit periodTimeUnit;
-    private final int requestLimit;
-    private final AtomicLong counts = new AtomicLong(0);
-    private final AtomicLong countRequest = new AtomicLong(0);
     private final Semaphore semaphore;
-    private final ScheduledExecutorService scheduledExecutor;
-
-    public CrptApi(int requestLimit, long periodLimit, TimeUnit periodTimeUnit) {
-        this.requestLimit = requestLimit;
-        this.periodTimeUnit = periodTimeUnit;
-        this.limitMs = periodTimeUnit.toMillis(periodLimit);
+    private ScheduledExecutorService scheduledExecutor;
+    public CrptApi(TimeUnit timeUnit, int requestLimit) {
+        this.periodTimeUnit = timeUnit;
+        this.limitMs = timeUnit.toMillis(requestLimit);
         semaphore = new Semaphore(requestLimit);
         scheduledExecutor = new ScheduledThreadPoolExecutor(requestLimit);
     }
 
-    public AtomicLong createDocument(Document document) {
+    public void createDocument(Document document) {
         scheduledExecutor.scheduleWithFixedDelay(() -> {
             try {
                 semaphore.acquire();
                 sendRequest(document);
-                countRequest.getAndIncrement();
-                counts.getAndAdd(countRequest.get());
-                System.out.println("Atomic count: " +  counts.get());
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             } finally {
-                if (countRequest.get() > requestLimit) {
-                    countRequest.set(0);
-                    semaphore.drainPermits();
-                } else
-                    semaphore. release();
+                semaphore.release();
             }
-        }, 0, limitMs, periodTimeUnit);
-        return counts;
+        }, 0,limitMs, periodTimeUnit);
     }
 
-    public void sendRequest(Document document) {
+    public synchronized void sendRequest(Document document) {
         try {
             HttpURLConnection urlConnection = (HttpURLConnection) new URL(URL).openConnection();
             urlConnection.setRequestMethod("POST");
             urlConnection.setRequestProperty("Content-Type", "application/json");
             urlConnection.setDoOutput(true);
             writeBodyToStream(document, urlConnection.getOutputStream());
+            logger.info(() -> "Request sent: " + document.docId);
         } catch (Exception e) {
+            logger.info(() -> "Error response: " + document.docId);
             System.out.printf("Connection error: %s", e.getMessage());
         }
     }
@@ -84,7 +73,7 @@ public class CrptApi {
 
     @AllArgsConstructor
     @Getter
-   public static class Document {
+    public static class Document {
         private Description description;
         private String docId;
         private String docStatus;
@@ -130,16 +119,16 @@ class CrptApiTest {
     private final CrptApi.Document.Description description = new CrptApi.Document.Description("participantInn");
     private final List<CrptApi.Document.Product> products = List.of(new CrptApi.Document.Product(
             "certificateDocument", Date.valueOf("2020-01-23"), "certificateDocumentNumber",
-            "ownerInn", "producerInn", Date.valueOf("2020-01-23"), "tnvedCode","uitCode", "uituCode"
+            "ownerInn", "producerInn", Date.valueOf("2020-01-23"), "tnvedCode", "uitCode", "uituCode"
     ));
-    private final CrptApi.Document document =  new CrptApi.Document(
-                        description, "docId", "docStatus", "docType",
+    private final CrptApi.Document document = new CrptApi.Document(
+            description, "docId", "docStatus", "docType",
             true, "ownerInn", "participantInn", "producerInn",
             Date.valueOf("2020-01-23"), "productionType", products,
-                  Date.valueOf("2020-01-23"), "regNumber"
+            Date.valueOf("2020-01-23"), "regNumber"
     );
 
-    private CrptApi crptApi  = new CrptApi(5, 1, TimeUnit.SECONDS);
+    private CrptApi crptApi = new CrptApi(TimeUnit.SECONDS, 5);
 
     @Test
     void sendLimitedRequest() throws InterruptedException {
@@ -148,7 +137,7 @@ class CrptApiTest {
         System.out.printf("Started at: %s\n", LocalTime.now());
         long countRequests = 0;
         while (end > System.currentTimeMillis()) {
-            countRequests = crptApi.createDocument(document).get();
+            crptApi.createDocument(document);
         }
         System.out.println("All time: " + (end - start) / 1000 + " s");
         System.out.printf("Ended at: %s", LocalTime.now());
