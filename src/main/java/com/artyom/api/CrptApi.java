@@ -30,6 +30,7 @@ public class CrptApi {
     private final TimeUnit periodTimeUnit;
     private final Semaphore semaphore;
     private ScheduledExecutorService scheduledExecutor;
+    private AtomicLong counterRequest = new AtomicLong(0);
     public CrptApi(TimeUnit timeUnit, int requestLimit) {
         this.periodTimeUnit = timeUnit;
         this.limitMs = timeUnit.toMillis(requestLimit);
@@ -42,6 +43,7 @@ public class CrptApi {
             try {
                 semaphore.acquire();
                 sendRequest(document);
+                counterRequest.incrementAndGet();
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             } finally {
@@ -142,7 +144,7 @@ class CrptApiTest {
         System.out.println("All time: " + (end - start) / 1000 + " s");
         System.out.printf("Ended at: %s", LocalTime.now());
         System.out.println(countRequests);
-        Assertions.assertEquals(25, countRequests);
+        Assertions.assertEquals(25, crptApi.getCounterRequest().get());
     }
 }
 
