@@ -28,11 +28,13 @@ public class CrptApi {
     private static final Logger logger = LoggerFactory.getLogger(CrptApi.class);
     private final Long limitMs;
     private final TimeUnit periodTimeUnit;
+    private final int requestLimit;
     private final Semaphore semaphore;
     private ScheduledExecutorService scheduledExecutor;
     private AtomicLong counterRequest = new AtomicLong(0);
     public CrptApi(TimeUnit timeUnit, int requestLimit) {
         this.periodTimeUnit = timeUnit;
+        this.requestLimit = requestLimit;
         this.limitMs = timeUnit.toMillis(requestLimit);
         semaphore = new Semaphore(requestLimit);
         scheduledExecutor = new ScheduledThreadPoolExecutor(requestLimit);
@@ -52,7 +54,7 @@ public class CrptApi {
         }, 0,limitMs, periodTimeUnit);
     }
 
-    public synchronized void sendRequest(Document document) {
+    public void sendRequest(Document document) {
         try {
             HttpURLConnection urlConnection = (HttpURLConnection) new URL(URL).openConnection();
             urlConnection.setRequestMethod("POST");
@@ -133,7 +135,7 @@ class CrptApiTest {
     private CrptApi crptApi = new CrptApi(TimeUnit.SECONDS, 5);
 
     @Test
-    void sendLimitedRequest() throws InterruptedException {
+    void sendLimitedRequest() throws InterruptedException, ExecutionException {
         var start = System.currentTimeMillis();
         var end = start + 5000;
         System.out.printf("Started at: %s\n", LocalTime.now());
