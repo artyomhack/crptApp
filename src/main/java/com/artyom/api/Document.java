@@ -1,4 +1,4 @@
-package com.artyom.api.task1;
+package com.artyom.api;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;

@@ -1,27 +1,13 @@
-package com.artyom.api.task2;
+package com.artyom.task.singleThreadPool;
 
 import java.util.ArrayList;
 
 public class SingleThreadPool {
 
-    private Thread backThread;
-
-    private final BlockingQueue blockingQueue;
-
-    public SingleThreadPool() {
-        blockingQueue = new BlockingQueue(1);
-    }
-
-    public SingleThreadPool(int countThreads) {
-        blockingQueue = new BlockingQueue(countThreads);
-    }
-
+    private static Thread backThread;
+    private BlockingQueue blockingQueue = new BlockingQueue();
     static class BlockingQueue {
-        private final ArrayList<Runnable> threads;
-
-        public BlockingQueue(int requestLimit) {
-            threads = new ArrayList<>(requestLimit);
-        }
+        private final ArrayList<Runnable> threads = new ArrayList<>();
 
         public synchronized Runnable get() {
             while (threads.isEmpty()) {
@@ -49,6 +35,7 @@ public class SingleThreadPool {
                 blockingQueue.get().run();
         });
 
+        backThread.setPriority(Thread.MAX_PRIORITY);
         backThread.start();
     }
 
