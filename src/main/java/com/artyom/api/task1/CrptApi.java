@@ -9,14 +9,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.time.LocalTime;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class CrptApi {
     private final static String URL = "https://ismp.crpt.ru/api/v3/lk/documents/create";
     private final static ObjectMapper MAPPER = new ObjectMapper();
     private final Semaphore semaphore;
     public CrptApi(int requestLimit, int periodLimit, TimeUnit timeUnit) {
-        semaphore = new Semaphore(periodLimit);
+        semaphore = new Semaphore(requestLimit);
         ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
         executorService.scheduleAtFixedRate(() -> releasePermits(requestLimit), timeUnit.toSeconds(periodLimit), periodLimit, timeUnit);
     }
