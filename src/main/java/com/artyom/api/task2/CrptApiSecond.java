@@ -1,6 +1,5 @@
 package com.artyom.api.task2;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -8,38 +7,20 @@ import org.junit.jupiter.api.TestFactory;
 import java.time.LocalTime;
 import java.util.Collection;
 import java.util.Random;
-import java.util.concurrent.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 public class CrptApiSecond {
     private final Semaphore semaphore;
-    private final Object lock = new Object();
-    private final long initialDelay;
+    private final int requestLimit;
+    private final long periodLimit;
 
     public CrptApiSecond(int requestLimit, int periodLimit, TimeUnit timeUnit) {
+        this.requestLimit = requestLimit;
+        this.periodLimit = timeUnit.toMillis(periodLimit);
         semaphore = new Semaphore(requestLimit);
-        initialDelay = timeUnit.toMillis(periodLimit);
-        new Thread(() -> {
-            while (true) {
-                if (semaphore.availablePermits() == 0) {
-                    try {
-                        releasePermits(requestLimit);
-                        Thread.sleep(initialDelay);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-                synchronized (lock) {
-                    try {
-                        lock.wait(initialDelay);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            }
-        }).start();
     }
 
     private void releasePermits(int permits) {
@@ -51,6 +32,20 @@ public class CrptApiSecond {
         System.out.println("Try to acquire " + semaphore.availablePermits() + " permits at " + LocalTime.now());
         try {
             semaphore.acquire();
+            new Thread(() -> {
+                var endLimitMs = System.currentTimeMillis() + periodLimit;
+                while (true) {
+                    if (endLimitMs > System.currentTimeMillis()) {
+                        try {
+                            Thread.sleep(endLimitMs - System.currentTimeMillis());
+                            releasePermits(requestLimit);
+                            endLimitMs = System.currentTimeMillis() + periodLimit;
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            }).start();
             return CompletableFuture.supplyAsync(() -> {
                 try {
                     return sendRequest();

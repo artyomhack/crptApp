@@ -1,5 +1,6 @@
 package com.artyom.api;
 
+import com.artyom.api.task1.CrptApiFirst;
 import com.artyom.api.task2.CrptApiSecond;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DynamicTest;
@@ -28,11 +29,11 @@ public class CrptApiTest {
     }
 
     private void createDocumentRequests(int count, int requestLimit, int periodSecLimit) {
-        var crpt = new CrptApiSecond(requestLimit, periodSecLimit, TimeUnit.SECONDS);
+        var my = new CrptApiSecond(requestLimit, periodSecLimit, TimeUnit.SECONDS);
         var start = System.currentTimeMillis();
         System.out.println("Start at " + LocalTime.now());
-        Stream.generate(() -> crpt.sendDocument())
-                .limit(10).count();
+        Stream.generate(my::createDocument)
+                .limit(count).count();
         var end = System.currentTimeMillis();
         System.out.println("End at " + LocalTime.now() + " after " + (end - start) + " ms");
         var expectedTime = (count + 1) / 100 * 1000;
