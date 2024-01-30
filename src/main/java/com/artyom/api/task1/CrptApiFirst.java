@@ -51,7 +51,7 @@ public class CrptApiFirst {
 
 }
 
-class MyTest {
+class MyFirstTest {
     @TestFactory
     Collection<DynamicTest> createLimitedRequestTest() {
         var random = new Random();
