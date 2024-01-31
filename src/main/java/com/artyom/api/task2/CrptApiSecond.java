@@ -37,15 +37,17 @@ public class CrptApiSecond {
                 while (true) {
                     if (endLimitMs > System.currentTimeMillis()) {
                         try {
-                            Thread.sleep(endLimitMs - System.currentTimeMillis());
-                            releasePermits(requestLimit);
-                            endLimitMs = System.currentTimeMillis() + periodLimit;
+                            Thread.sleep(periodLimit);
+                            if (semaphore.availablePermits() == 0)
+                                releasePermits(requestLimit);
                         } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
                     }
+                    endLimitMs = System.currentTimeMillis() + periodLimit;
                 }
             }).start();
+
             return CompletableFuture.supplyAsync(() -> {
                 try {
                     return sendRequest();
